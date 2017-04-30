@@ -137,6 +137,7 @@ function mirror (src, dst, opts, cb) {
 
   function del (b, cb) {
     progress.emit('del', b)
+    if (opts.dryRun) return cb()
     if (!b.stat.isDirectory()) return b.fs.unlink(b.name, cb)
     rimraf(b, function () { // ignore errors for now
       cb()
@@ -167,6 +168,10 @@ function mirror (src, dst, opts, cb) {
 
   function put (a, b, cb) {
     progress.emit('put', a, b)
+    if (opts.dryRun) {
+      if (a.stat.isDirectory()) return cb() // Don't call put-end
+      return onfinish()
+    }
     if (a.stat.isDirectory()) return b.fs.mkdir(b.name, a.stat.mode, ignoreError(cb))
 
     if (a.live && a.fs.open) {
@@ -194,11 +199,6 @@ function mirror (src, dst, opts, cb) {
         progress.emit('put-data', data, a, b)
       }
 
-      function onfinish () {
-        progress.emit('put-end', a, b)
-        cb()
-      }
-
       function onerror (err) {
         progress.emit('put-error', a, b)
         rs.destroy()
@@ -206,6 +206,11 @@ function mirror (src, dst, opts, cb) {
         ws.removeListener('finish', cb)
         cb(err)
       }
+    }
+
+    function onfinish () {
+      progress.emit('put-end', a, b)
+      cb()
     }
   }
 
